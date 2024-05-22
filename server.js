@@ -204,6 +204,11 @@ document.addEventListener("DOMContentLoaded", function () {
 		wing.play();
 	});
 
+	document.addEventListener("touchstart", () => {
+		bird.dy = -2.5;
+		wing.play();
+	});
+
 	function checkCollision(pipe) {
 		if (bird.y <= pipe.top.height) {
 			if (bird.x + bird.width >= pipe.x && bird.x <= pipe.x + pipeWidth) {
