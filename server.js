@@ -59,6 +59,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 		}
 	});
+
 	function resetGame() {
 		bird.y = 150;
 		bird.dy = 0;
@@ -68,10 +69,17 @@ document.addEventListener("DOMContentLoaded", function () {
 	}
 
 	document.addEventListener("keydown", (event) => {
+		if (event.key === "Alt" || event.key === "Tab") {
+			return;
+		}
+
 		if (gameState === "menu" || gameState === "gameOver") {
 			gameState = "play";
 			resetGame();
 		}
+
+		bird.dy = -2.5;
+		wing.play();
 	});
 
 	const startImage = new Image();
@@ -106,8 +114,9 @@ document.addEventListener("DOMContentLoaded", function () {
 			gameOverButton.height
 		);
 	}
-	const pipeWidth = 70;
-	const pipeGap = 200;
+
+	const pipeWidth = 90;
+	const pipeGap = 190;
 
 	let pipes = [];
 
@@ -150,21 +159,23 @@ document.addEventListener("DOMContentLoaded", function () {
 	const pointSound = new Audio("public/sounds/point.wav");
 
 	function updatePipes() {
-		for (let pipe of pipes) {
-			pipe.x -= 2;
+		if (gameState === "play") {
+			for (let pipe of pipes) {
+				pipe.x -= 2;
 
-			if (checkCollision(pipe)) {
-				gameState = "gameOver";
-				deathSound.play();
-			}
+				if (checkCollision(pipe)) {
+					gameState = "gameOver";
+					deathSound.play();
+				}
 
-			if (bird.x > pipe.x + pipeWidth && !pipe.passed) {
-				pipe.passed = true;
-				score++;
-				pointSound.play();
+				if (bird.x > pipe.x + pipeWidth && !pipe.passed) {
+					pipe.passed = true;
+					score++;
+					pointSound.play();
 
-				if (score > highScore) {
-					highScore = score;
+					if (score > highScore) {
+						highScore = score;
+					}
 				}
 			}
 
@@ -172,48 +183,66 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 	}
 
-	const birdImage = new Image();
-	birdImage.src = "public/redbird-midflap.png";
+	const birdImageTop = new Image();
+	birdImageTop.src = "public/yellowbird-upflap.png";
+
+	const birdImageMid = new Image();
+	birdImageMid.src = "public/yellowbird-midflap.png";
+
+	const birdImageBottom = new Image();
+	birdImageBottom.src = "public/yellowbird-downflap.png";
 
 	const bird = {
 		x: 150,
 		y: 150,
-		width: 50,
+		width: 60,
 		height: 50,
 		dy: 0,
 	};
 
+	const birdImages = [birdImageTop, birdImageMid, birdImageBottom];
+	let birdImageIndex = 0;
+
+	let birdRotationDelay = 20;
+
 	function drawBird() {
-		ctx.drawImage(birdImage, bird.x, bird.y, bird.width, bird.height);
+		ctx.save();
+		ctx.translate(bird.x + bird.width / 2, bird.y + bird.height / 2);
+		if (bird.dy < 0) {
+			ctx.rotate(-0.5);
+			birdRotationDelay = 30;
+		} else if (birdRotationDelay <= 0) {
+			ctx.rotate(0.9);
+		} else {
+			birdRotationDelay--;
+		}
+		ctx.drawImage(
+			birdImages[birdImageIndex],
+			-bird.width / 2,
+			-bird.height / 2,
+			bird.width,
+			bird.height
+		);
+		ctx.restore();
+		if (frames % 10 === 0) {
+			birdImageIndex = (birdImageIndex + 1) % birdImages.length;
+		}
 	}
 
 	const wing = new Audio("public/sounds/wing.wav");
 
 	function updateBird() {
-		bird.y += bird.dy;
-		bird.dy += 0.07;
+		if (gameState === "play") {
+			bird.y += bird.dy;
+			bird.dy += 0.07;
 
-		if (bird.y < 0 || bird.y + bird.height > canvas.height) {
-			gameState = "gameOver";
-			deathSound.play();
+			if (bird.y + bird.height >= canvas.height - baseImage.height) {
+				gameState = "gameOver";
+				deathSound.play();
+			}
 		}
 	}
 
-	document.addEventListener("keydown", () => {
-		bird.dy = -2.5;
-		wing.play();
-	});
-
-document.addEventListener(
-	"touchstart",
-	(event) => {
-		event.preventDefault();
-		bird.dy = -2.5;
-		wing.play();
-	},
-	{ passive: false }
-);
-	
 	function checkCollision(pipe) {
 		if (bird.y <= pipe.top.height) {
 			if (bird.x + bird.width >= pipe.x && bird.x <= pipe.x + pipeWidth) {
@@ -242,28 +271,54 @@ document.addEventListener(
 		}
 	}
 
+	const baseImage = new Image();
+	baseImage.src = "public/base.png";
+
+	let baseX = 0;
+
+	function drawBase() {
+		for (let i = 0; i <= canvas.width / baseImage.width + 400; i++) {
+			ctx.drawImage(
+				baseImage,
+				baseX + i * baseImage.width,
+				canvas.height - baseImage.height
+			);
+		}
+	}
+
+	function updateBase() {
+		if (gameState === "play") {
+			baseX -= 3;
+			if (baseX <= -baseImage.width) {
+				baseX = 0;
+			}
+		}
+	}
+
 	function gameLoop() {
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 
 		if (gameState === "menu") {
 			drawStartScreen();
-		} else if (gameState === "play") {
+		} else {
 			drawPipes();
-			updatePipes();
-
 			drawBird();
-			updateBird();
-
+			drawBase();
 			drawScore();
 
-			if (frames % 250 === 0) {
-				generatePipe();
+			if (gameState === "play") {
+				updatePipes();
+				updateBird();
+				updateBase();
+
+				if (frames % 240 === 0) {
+					generatePipe();
+				}
+
+				frames++;
+			} else if (gameState === "gameOver") {
+				drawGameOverScreen();
 			}
-
-			frames++;
-		} else if (gameState === "gameOver") {
-			drawGameOverScreen();
-			drawScore();
 		}
 
 		requestAnimationFrame(gameLoop);
